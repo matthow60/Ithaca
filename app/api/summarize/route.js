@@ -1,5 +1,5 @@
 import { GoogleGenAI } from '@google/genai';
-import { idFilter, incidentsCollection } from '../../../lib/mongodb';
+import { idFilter, incidentsCollection, normalizeIncident } from '../../../lib/mongodb';
 import { buildIncidentPrompt } from '../../../lib/geminiPrompt';
 
 export const dynamic = 'force-dynamic';
@@ -46,14 +46,15 @@ export async function POST(req) {
     if (!incidentId) return Response.json({ error: 'incidentId is required' }, { status: 400 });
 
     const col = await incidentsCollection();
-    const incident = await col.findOne(idFilter(incidentId));
-    if (!incident) return Response.json({ error: 'Incident not found' }, { status: 404 });
-    if (incident.summary) return Response.json(incident.summary);
+    const doc = await col.findOne(idFilter(incidentId));
+    if (!doc) return Response.json({ error: 'Incident not found' }, { status: 404 });
+    if (doc.summary) return Response.json(doc.summary);
 
+    const incident = normalizeIncident(doc);
     const parsed = await askGemini(
       buildIncidentPrompt({
-        stackTrace: incident.stackTrace ?? '',
-        actions: incident.actions ?? [],
+        stackTrace: incident.stackTrace,
+        actions: incident.actions,
         codeDiff: incident.codeDiff,
       })
     );
@@ -62,7 +63,7 @@ export async function POST(req) {
       whyTriggered: parsed.whyTriggered ?? '',
       howFixed: parsed.howFixed ?? '',
     };
-    await col.updateOne({ _id: incident._id }, { $set: { summary } });
+    await col.updateOne({ _id: doc._id }, { $set: { summary } });
     return Response.json(summary);
   } catch (err) {
     console.error('[api/summarize]', err);
