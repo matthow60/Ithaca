@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { fetchSummary } from '../lib/api';
+import { ScrollIcon } from './Icons';
+import Pillar from './Pillar';
+import ShaderCanvas from './ShaderCanvas';
 
 const SECTIONS = [
   ['whatBroke', 'What broke'],
@@ -9,7 +12,7 @@ const SECTIONS = [
   ['howFixed', 'How the PR fixes it'],
 ];
 
-export default function GeminiSummary({ incident, source }) {
+export default function GeminiSummary({ incident }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -24,18 +27,20 @@ export default function GeminiSummary({ incident, source }) {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetchSummary(incident, source)
+    fetchSummary(incident)
       .then((s) => !cancelled && setSummary(s))
       .catch((e) => !cancelled && setError(e.message))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [incident._id, ready, source]); // intentionally not re-fetching on every poll
+  }, [incident._id, ready]); // intentionally not re-fetching on every poll
 
   return (
     <section className="card gemini">
+      <ShaderCanvas variant="oracle" className="card-shader" />
       <h2>
+        <ScrollIcon />
         Gemini Incident Summary <span className="muted">plain English</span>
       </h2>
       {!ready && <div className="empty">Summary is generated once Gemini's PR is ready.</div>}
@@ -45,10 +50,9 @@ export default function GeminiSummary({ incident, source }) {
       {ready && !loading && summary && (
         <div className="summary-grid">
           {SECTIONS.map(([key, title]) => (
-            <div key={key} className="summary-block">
-              <h3>{title}</h3>
-              <p>{summary[key]}</p>
-            </div>
+            <Pillar key={key} title={title}>
+              {summary[key]}
+            </Pillar>
           ))}
         </div>
       )}

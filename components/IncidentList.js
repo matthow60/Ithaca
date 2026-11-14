@@ -17,7 +17,7 @@ export default function IncidentList({ incidents, selectedId, onSelect }) {
             onClick={() => onSelect(inc._id)}
           >
             <div className="incident-item-top">
-              <span className="incident-id">#{inc._id.replace('incident-', '')}</span>
+              <span className="incident-id">#{inc.incidentId.replace('incident-', '')}</span>
               <StatusBadge status={inc.status} />
             </div>
             <div className="incident-route">{inc.route}</div>
