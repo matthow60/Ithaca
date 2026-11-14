@@ -7,6 +7,13 @@ import path from 'node:path';
 import { simpleGit } from 'simple-git';
 import { redact } from './log.js';
 
+// The token is already in the clone URL. Without this, the OS credential manager
+// (e.g. Git Credential Manager on Windows) saves "x-access-token" as a second GitHub
+// account, and the developer gets an account picker on every push.
+// simple-git refuses to touch credential.helper unless opted in; we only ever set it to empty.
+const NO_CREDENTIAL_HELPER = ['credential.helper='];
+const GIT_OPTS = { config: NO_CREDENTIAL_HELPER, unsafe: { allowUnsafeCredentialHelper: true } };
+
 /** Incident ids end up in paths and branch names, so keep them boring. */
 export function safeId(incidentId) {
   return String(incidentId).replace(/[^A-Za-z0-9._-]/g, '_');
@@ -27,12 +34,14 @@ export async function cloneRepo(incidentId) {
 
   const url = `https://x-access-token:${GH_TOKEN}@github.com/${TARGET_OWNER}/${TARGET_REPO}.git`;
   try {
-    await simpleGit().clone(url, dir, ['--depth', '1']);
+    await simpleGit(GIT_OPTS).clone(url, dir, ['--depth', '1']);
   } catch (err) {
     throw new Error(`git clone failed: ${redact(err.message)}`);
   }
 
-  const git = simpleGit(dir);
+  const git = simpleGit(dir, GIT_OPTS);
+  // Also persist it in the clone's own config so every later command (push) skips the helper.
+  await git.addConfig('credential.helper', '');
   await git.addConfig('user.name', 'AutoFix Bot');
   await git.addConfig('user.email', 'autofix-bot@users.noreply.github.com');
   return { dir, git };
