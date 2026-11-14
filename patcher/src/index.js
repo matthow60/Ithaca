@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import './env.js'; // shared repo-root .env
 import express from 'express';
 import { connectDb, dbName, incidents, resetIncident } from './db.js';
 import { runIncident } from './pipeline.js';

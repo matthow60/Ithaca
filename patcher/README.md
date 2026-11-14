@@ -40,7 +40,7 @@ target app.
 ```bash
 cd patcher
 npm install        # also downloads headless Chromium for Playwright (~300 MB, once)
-cp .env.example .env
+cp ../.env.example ../.env   # one .env at the repo root, shared with the dashboard
 ```
 
 ## Environment variables

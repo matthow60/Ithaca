@@ -7,12 +7,13 @@ export const dynamic = 'force-dynamic';
 // Primary + fallback Gemini configs. Accepts either GEMINI_* or the team's LLM_* names.
 function geminiConfigs() {
   const env = process.env;
+  const primaryKey = env.GEMINI_API_KEY || env.LLM_API_KEY;
+  // Defaults match patcher/.env.example. gemini-2.5-flash is retired for new keys, and
+  // gemini-flash-latest points at the newest model, which is often overloaded.
   return [
-    {
-      apiKey: env.GEMINI_API_KEY || env.LLM_API_KEY,
-      model: env.GEMINI_MODEL || env.LLM_MODEL || 'gemini-flash-latest',
-    },
-    { apiKey: env.LLM_FALLBACK_API_KEY, model: env.LLM_FALLBACK_MODEL || 'gemini-2.5-flash' },
+    { apiKey: primaryKey, model: env.GEMINI_MODEL || env.LLM_MODEL || 'gemini-3.5-flash' },
+    // Fallback reuses the primary key unless it has its own (another Gemini model, same account).
+    { apiKey: env.LLM_FALLBACK_API_KEY || primaryKey, model: env.LLM_FALLBACK_MODEL || 'gemini-3.1-flash-lite' },
   ].filter((c) => c.apiKey);
 }
 

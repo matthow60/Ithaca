@@ -2,7 +2,7 @@
 //   node scripts/seed.js                 → incident-123
 //   node scripts/seed.js incident-456    → custom id
 // Re-seeding deletes and re-inserts, so the change stream sees a fresh insert.
-import 'dotenv/config';
+import '../src/env.js'; // shared repo-root .env
 import { connectDb, closeDb, incidents } from '../src/db.js';
 
 const incidentId = process.argv[2] || 'incident-123';
