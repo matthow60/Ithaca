@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "db:test": "node --env-file=.env scripts/test-db.mjs"
+    "db:test": "node --env-file=.env scripts/test-db.mjs",
+    "llm:test": "node --env-file=.env scripts/test-gemini.mjs"
   },
   "dependencies": {
     "@google/genai": "^3.3.0",
