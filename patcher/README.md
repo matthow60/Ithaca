@@ -29,8 +29,8 @@ commit fix  +  commit .autofix/<id>/*.png  → push fix/<id> → PR             
 Once it's running there is nothing to do by hand: crashes get inserted, the change stream picks
 them up, and PRs appear. A human reviews and merges.
 
-> 🚧 **AI patch generation is a stub.** `src/llm.js` serves hand-written patches from `patches/`.
-> Everything else (clone, reproduce, verify, screenshots, PR, Mongo updates) is real.
+> **Patch source:** `LLM_MODE=llm` asks Gemini (or any OpenAI-compatible model) to write the fix;
+> `LLM_MODE=mock` uses hand-written fixes from `patches/` (handy for a guaranteed demo).
 
 ## Setup
 
@@ -54,8 +54,9 @@ cp .env.example .env
 | `TARGET_START_CMD` | `node server/index.js` | Boots the target app from the repo root. Must listen on `process.env.PORT` |
 | `TARGET_SERVER_DIR` | `.` | Folder (relative to repo root) where `npm ci` runs |
 | `PORT` | `4000` | Patcher HTTP port |
-| `LLM_MODE` | `mock` | `mock` = use `patches/`; `llm` = not implemented yet |
-| `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`, `LLM_FALLBACK_*` | — | Placeholders for the real `llm.js` |
+| `LLM_MODE` | `mock` | `llm` = AI writes the fix; `mock` = use `patches/` |
+| `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL` | — | Primary AI model (OpenAI-compatible endpoint, e.g. Gemini) |
+| `LLM_FALLBACK_BASE_URL`, `LLM_FALLBACK_API_KEY`, `LLM_FALLBACK_MODEL` | — | Used when the primary is busy (429/5xx), times out, or errors |
 
 The clone goes to `<os temp dir>/<incidentId>` and is always deleted afterwards. `GH_TOKEN` and the LLM
 keys are removed from the environment the target app runs with.
@@ -143,15 +144,15 @@ clone). If that fails it falls back to `error.file` / `error.line`.
 No matching file → the run fails with `No mock patch for <file> — AI patching not implemented yet`.
 The included `patches/server/src/routes/cart.js` matches the seed incident.
 
-## Next: implement `llm.js`
+## AI patching (`src/llm.js`)
 
-Everything is in place except the network call:
+- `buildPrompt` sends the broken file, stack trace, crashing line, the user's steps, the request,
+  and on retries **why the previous fix failed** (replay output), asking for the full fixed file.
+- Calls `${LLM_BASE_URL}/chat/completions`. If the model is busy (429/503) it waits 3 s, then 8 s,
+  and then switches to the `LLM_FALLBACK_*` model. 60 s timeout per call.
+- A reply with no code block, or a fix that still crashes on replay, counts as a failed attempt
+  (max 3). Config errors and missing mock patches stop the run immediately.
+- Line endings of the original file are preserved so the PR diff only shows real changes.
 
-- `buildPrompt(...)` — done; includes the file, stack, the user's steps, the request, and on
-  retries the previous attempt's failure output.
-- `extractCodeBlock(text)` — done.
-- **TODO** (marked in `generatePatch`): when `LLM_MODE=llm`, POST to `${LLM_BASE_URL}/chat/completions`
-  (Gemini's OpenAI-compatible endpoint or Groq), fall back to `LLM_FALLBACK_*` on 429/5xx, return
-  `{ patchedContent: extractCodeBlock(content), source: 'llm' }`.
-
-Keep the `generatePatch` signature unchanged — nothing else needs to change.
+Gemini model names change often and older ones get retired for new keys. List what your key can
+use with `curl -H "Authorization: Bearer KEY" https://generativelanguage.googleapis.com/v1beta/openai/models`.

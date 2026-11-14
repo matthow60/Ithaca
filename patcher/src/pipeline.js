@@ -75,19 +75,26 @@ export async function runIncident(incidentId) {
     for (attempts = 1; attempts <= MAX_ATTEMPTS; attempts++) {
       if (attempts > 1) await updateIncident(incidentId, { status: 'patching', 'fix.attempts': attempts });
 
-      const patch = await log.step(`generate patch (attempt ${attempts}/${MAX_ATTEMPTS})`, () =>
-        generatePatch({
-          filePath,
-          fileContent: original, // always patch from the original, not the last failed attempt
-          crashLine,
-          stack: incident.error?.stack,
-          actions,
-          request: incident.request,
-          previousAttemptError,
-        }),
-      );
+      let patch;
+      try {
+        patch = await log.step(`generate patch (attempt ${attempts}/${MAX_ATTEMPTS})`, () =>
+          generatePatch({
+            filePath,
+            fileContent: original, // always patch from the original, not the last failed attempt
+            crashLine,
+            stack: incident.error?.stack,
+            actions,
+            request: incident.request,
+            previousAttemptError,
+          }),
+        );
+      } catch (err) {
+        if (err.fatal) throw err; // config problem / no mock patch — retrying won't help
+        previousAttemptError = `Your previous reply could not be used: ${err.message}`;
+        continue;
+      }
       patchSource = patch.source;
-      await writeRepoFile(dir, filePath, patch.patchedContent);
+      await writeRepoFile(dir, filePath, matchLineEndings(patch.patchedContent, original));
 
       await updateIncident(incidentId, { status: 'verifying', 'fix.attempts': attempts });
       const result = await log.step(`prove fix (replay user steps on patched code, attempt ${attempts}/${MAX_ATTEMPTS})`, () =>
@@ -192,6 +199,12 @@ function logSteps(log, label, browser) {
     const mark = s.serverErrors ? `❌ ${s.serverErrors}× 5xx` : s.ok ? '✔' : `⚠ ${s.error}`;
     log(`  ${label} step ${s.step}: ${s.type} ${s.target ?? ''} → ${mark}`);
   }
+}
+
+/** Keep the original file's CRLF/LF style so the diff shows only real changes. */
+export function matchLineEndings(patched, original) {
+  const lf = patched.replace(/\r\n/g, '\n');
+  return original.includes('\r\n') ? lf.replace(/\n/g, '\r\n') : lf;
 }
 
 const firstLine = (s) => String(s ?? '').split('\n')[0];
