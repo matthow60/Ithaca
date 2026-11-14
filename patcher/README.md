@@ -47,8 +47,9 @@ cp .env.example .env
 
 | Var | Default | Purpose |
 |---|---|---|
-| `MONGO_URI` | — | Mongo connection string |
-| `MONGO_DB` | `autofix` | Database holding the `incidents` collection |
+| `MONGODB_URI` | — | Mongo connection string (same name as the dashboard) |
+| `MONGODB_DB` | `hackuta` | Database shared with the dashboard |
+| `MONGODB_COLLECTION` | `incidents` | Collection holding incidents |
 | `GH_TOKEN` | — | Fine-grained token: Contents + Pull requests read/write on the target repo only |
 | `TARGET_OWNER` / `TARGET_REPO` | — | Repo to clone and open PRs against |
 | `TARGET_START_CMD` | `node server/index.js` | Boots the target app from the repo root. Must listen on `process.env.PORT` |
@@ -126,7 +127,7 @@ if you don't want them in `main`.
   error }                                  // set when status is failed / not_reproducible
 ```
 
-Statuses: `open → patching → reproducing → patching → verifying → fixed`, or `failed` /
+Statuses: `open → reproducing → patching → verifying → fixed`, or `failed` /
 `not_reproducible`.
 
 ## Adding a mock patch

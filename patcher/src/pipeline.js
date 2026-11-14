@@ -24,7 +24,7 @@ export async function runIncident(incidentId) {
     log('not open (missing or already claimed) — skipping');
     return { skipped: true };
   }
-  log('claimed, status → patching');
+  log('claimed, status → reproducing');
 
   let dir;
   let attempts = 0;
@@ -45,8 +45,7 @@ export async function runIncident(incidentId) {
     const evidenceRelDir = `.autofix/${safeId(incidentId)}`;
     const evidenceDir = path.join(dir, evidenceRelDir);
 
-    // 4. Reproduce on the original code before touching anything
-    await updateIncident(incidentId, { status: 'reproducing' });
+    // 4. Reproduce on the original code before touching anything (status is already "reproducing")
     const reproduction = await log.step(`reproduce (replay ${actions.length} user steps on original code)`, () =>
       reproduce({ dir, actions, request: incident.request, evidenceDir }),
     );

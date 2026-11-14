@@ -5,11 +5,12 @@ let db;
 
 export async function connectDb() {
   if (db) return db;
-  const uri = process.env.MONGO_URI;
-  if (!uri) throw new Error('MONGO_URI is not set');
+  // Same variable names and defaults as the dashboard (lib/mongodb.js).
+  const uri = process.env.MONGODB_URI;
+  if (!uri) throw new Error('MONGODB_URI is not set');
   client = new MongoClient(uri);
   await client.connect();
-  db = client.db(process.env.MONGO_DB || 'autofix');
+  db = client.db(dbName());
   await incidents().createIndex({ incidentId: 1 }, { unique: true });
   return db;
 }
@@ -20,19 +21,21 @@ export async function closeDb() {
   db = undefined;
 }
 
+export const dbName = () => process.env.MONGODB_DB || 'hackuta';
+
 export function incidents() {
   if (!db) throw new Error('Database not connected — call connectDb() first');
-  return db.collection('incidents');
+  return db.collection(process.env.MONGODB_COLLECTION || 'incidents');
 }
 
 /**
- * Atomically move an incident from "open" to "patching".
+ * Atomically move an incident from "open" to "reproducing" (the pipeline's first stage).
  * Returns the claimed document, or null if it doesn't exist / was already claimed.
  */
 export async function claimIncident(incidentId) {
   return incidents().findOneAndUpdate(
     { incidentId, status: 'open' },
-    { $set: { status: 'patching', claimedAt: new Date() } },
+    { $set: { status: 'reproducing', claimedAt: new Date() } },
     { returnDocument: 'after' },
   );
 }

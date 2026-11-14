@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import { connectDb, incidents, resetIncident } from './db.js';
+import { connectDb, dbName, incidents, resetIncident } from './db.js';
 import { runIncident } from './pipeline.js';
 
 const PORT = Number(process.env.PORT || 4000);
@@ -93,6 +93,6 @@ function watchIncidents() {
 
 // ─── Boot ────────────────────────────────────────────────────────────────────
 await connectDb();
-console.log(`connected to Mongo db "${process.env.MONGO_DB || 'autofix'}"`);
+console.log(`connected to Mongo db "${dbName()}"`);
 app.listen(PORT, () => console.log(`patcher listening on :${PORT} (LLM_MODE=${LLM_MODE()})`));
 watchIncidents();

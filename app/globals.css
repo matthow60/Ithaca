@@ -6,8 +6,8 @@
     Layout ....... .app .sidebar .main .detail-grid .stack .card
     Sidebar ...... .brand .live .sidebar-heading .incident-list .incident-item(.selected)
     Header ....... .incident-header .error-msg .pr-button(.disabled)
-    Status ....... .badge .badge-open .badge-patching .badge-fixed
-                   .pipeline .pipeline-step(.done/.active/.pending) .step-open/.step-patching/.step-fixed
+    Status ....... .badge .badge-open .badge-reproducing .badge-patching .badge-fixed .badge-failed
+                   .pipeline .pipeline-step(.done/.active/.pending) .step-open/.step-reproducing/.step-patching/.step-fixed/.step-failed
     Gemini ....... .gemini .summary-grid .summary-block
     Timeline ..... .timeline .timeline-item(.crash) .type-pill .type-click/.type-input/.type-navigate
     Code ......... .trace .diff .diff-line .diff-add .diff-del .diff-hunk .diff-file
@@ -31,8 +31,10 @@ body { margin: 0; font-family: system-ui, sans-serif; }
 
 /* Status colors */
 .badge-open, .error-msg, .timeline-item.crash { color: red; }
+.badge-reproducing { color: purple; }
 .badge-patching { color: orange; }
 .badge-fixed { color: green; }
+.badge-failed, .step-failed { color: darkred; }
 
 /* Code blocks + diff */
 .trace, .diff { overflow-x: auto; font-size: 12px; }
