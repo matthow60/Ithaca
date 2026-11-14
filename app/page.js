@@ -151,7 +151,7 @@ export default function Dashboard() {
                 </section>
                 <section className="card">
                   <h2>
-                    Grok Patch <span className="muted">code diff</span>
+                    Gemini Patch <span className="muted">code diff</span>
                   </h2>
                   <DiffViewer diff={selected.codeDiff} />
                 </section>
