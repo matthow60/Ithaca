@@ -9,7 +9,7 @@ function lineKind(line) {
 
 export default function DiffViewer({ diff }) {
   if (!diff) {
-    return <div className="empty">No patch yet. Grok's diff appears here once the PR is ready.</div>;
+    return <div className="empty">No patch yet. Gemini's diff appears here once the PR is ready.</div>;
   }
 
   return (

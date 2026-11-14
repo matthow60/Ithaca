@@ -15,7 +15,7 @@ export default function GeminiSummary({ incident, source }) {
   const [error, setError] = useState(null);
   const ready = incident.status === 'fixed';
 
-  // Re-run when the incident changes or flips to "fixed" (Grok's diff is needed).
+  // Re-run when the incident changes or flips to "fixed" (the patch diff is needed).
   useEffect(() => {
     if (!ready) {
       setSummary(null);
@@ -38,7 +38,7 @@ export default function GeminiSummary({ incident, source }) {
       <h2>
         Gemini Incident Summary <span className="muted">plain English</span>
       </h2>
-      {!ready && <div className="empty">Summary is generated once Grok's PR is ready.</div>}
+      {!ready && <div className="empty">Summary is generated once Gemini's PR is ready.</div>}
       {ready && loading && <div className="empty shimmer">Asking Gemini…</div>}
       {ready && !loading && error && <div className="error">{error}</div>}
       {ready && !loading && !error && !summary && <div className="empty">No summary available.</div>}
