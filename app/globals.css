@@ -1,0 +1,40 @@
+/*
+  Minimal styles: layout + the few colors the UI needs to make sense.
+  TODO(styling): add theme, spacing, fonts, animations later.
+
+  Class hooks available in the components:
+    Layout ....... .app .sidebar .main .detail-grid .stack .card
+    Sidebar ...... .brand .live .sidebar-heading .incident-list .incident-item(.selected)
+    Header ....... .incident-header .error-msg .pr-button(.disabled)
+    Status ....... .badge .badge-open .badge-patching .badge-fixed
+                   .pipeline .pipeline-step(.done/.active/.pending) .step-open/.step-patching/.step-fixed
+    Gemini ....... .gemini .summary-grid .summary-block
+    Timeline ..... .timeline .timeline-item(.crash) .type-pill .type-click/.type-input/.type-navigate
+    Code ......... .trace .diff .diff-line .diff-add .diff-del .diff-hunk .diff-file
+*/
+
+body { margin: 0; font-family: system-ui, sans-serif; }
+
+/* Layout: sidebar + main column */
+.app { display: grid; grid-template-columns: 280px 1fr; min-height: 100vh; }
+.sidebar { border-right: 1px solid #ccc; padding: 12px; }
+.main { padding: 16px; }
+.detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.card { border: 1px solid #ccc; padding: 12px; margin-bottom: 16px; }
+
+/* Lists */
+.incident-list, .timeline, .pipeline { list-style: none; padding: 0; }
+.incident-item { width: 100%; text-align: left; }
+.incident-item.selected { font-weight: bold; }
+.pipeline, .timeline-item, .incident-item-top { display: flex; gap: 8px; }
+.pipeline-step.active { font-weight: bold; text-decoration: underline; }
+
+/* Status colors */
+.badge-open, .error-msg, .timeline-item.crash { color: red; }
+.badge-patching { color: orange; }
+.badge-fixed { color: green; }
+
+/* Code blocks + diff */
+.trace, .diff { overflow-x: auto; font-size: 12px; }
+.diff-add { background: #e6ffed; }
+.diff-del { background: #ffeef0; }
