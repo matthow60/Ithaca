@@ -9,9 +9,10 @@ const SECTIONS = [
   ['howFixed', 'How the PR fixes it'],
 ];
 
-export default function GeminiSummary({ incident }) {
+export default function GeminiSummary({ incident, source }) {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const ready = incident.status === 'fixed';
 
   // Re-run when the incident changes or flips to "fixed" (Grok's diff is needed).
@@ -22,13 +23,15 @@ export default function GeminiSummary({ incident }) {
     }
     let cancelled = false;
     setLoading(true);
-    fetchSummary(incident)
+    setError(null);
+    fetchSummary(incident, source)
       .then((s) => !cancelled && setSummary(s))
+      .catch((e) => !cancelled && setError(e.message))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [incident._id, ready]); // intentionally not re-fetching on every poll
+  }, [incident._id, ready, source]); // intentionally not re-fetching on every poll
 
   return (
     <section className="card gemini">
@@ -37,7 +40,8 @@ export default function GeminiSummary({ incident }) {
       </h2>
       {!ready && <div className="empty">Summary is generated once Grok's PR is ready.</div>}
       {ready && loading && <div className="empty shimmer">Asking Gemini…</div>}
-      {ready && !loading && !summary && <div className="empty">No summary available.</div>}
+      {ready && !loading && error && <div className="error">{error}</div>}
+      {ready && !loading && !error && !summary && <div className="empty">No summary available.</div>}
       {ready && !loading && summary && (
         <div className="summary-grid">
           {SECTIONS.map(([key, title]) => (

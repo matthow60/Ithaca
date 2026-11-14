@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { fetchIncidents } from '../lib/api';
+import { DEFAULT_SOURCE, fetchIncidents, restartSimulation } from '../lib/api';
 import IncidentList from '../components/IncidentList';
 import StatusPipeline from '../components/StatusPipeline';
 import ActionTimeline from '../components/ActionTimeline';
@@ -9,19 +9,42 @@ import DiffViewer from '../components/DiffViewer';
 import GeminiSummary from '../components/GeminiSummary';
 
 const POLL_MS = 3000;
+const SOURCE_KEY = 'dashboard:dataSource';
 
 export default function Dashboard() {
   const [incidents, setIncidents] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [error, setError] = useState(null);
+  const [source, setSource] = useState(DEFAULT_SOURCE);
 
-  // Poll for incidents. TODO(backend): see lib/api.js for the MongoDB route.
+  // Restore the last-used data source (read after mount to avoid a hydration mismatch).
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SOURCE_KEY);
+      if (saved === 'mock' || saved === 'live') setSource(saved);
+    } catch {}
+  }, []);
+
+  function changeSource(next) {
+    if (next === source) return;
+    try {
+      localStorage.setItem(SOURCE_KEY, next);
+    } catch {}
+    if (next === 'mock') restartSimulation(); // replay the Crash → Patching → PR Ready demo
+    setIncidents([]);
+    setSelectedId(null);
+    setLastUpdated(null);
+    setError(null);
+    setSource(next);
+  }
+
+  // Poll for incidents from the selected source (see lib/api.js).
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const data = await fetchIncidents();
+        const data = await fetchIncidents(source);
         if (cancelled) return;
         setIncidents(data);
         setLastUpdated(new Date());
@@ -36,7 +59,7 @@ export default function Dashboard() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, []);
+  }, [source]);
 
   const selected = incidents.find((i) => i._id === selectedId) ?? incidents[0];
   const openCount = incidents.filter((i) => i.status !== 'fixed').length;
@@ -48,8 +71,24 @@ export default function Dashboard() {
           <span className="brand-mark" />
           Incident Command
         </div>
+        <div className="source-toggle" role="group" aria-label="Data source">
+          <button
+            className={source === 'mock' ? 'active' : ''}
+            aria-pressed={source === 'mock'}
+            onClick={() => changeSource('mock')}
+          >
+            Simulated
+          </button>
+          <button
+            className={source === 'live' ? 'active' : ''}
+            aria-pressed={source === 'live'}
+            onClick={() => changeSource('live')}
+          >
+            Live (MongoDB)
+          </button>
+        </div>
         <div className="live">
-          <span className="live-dot" /> Live
+          <span className="live-dot" /> {source === 'live' ? 'Live' : 'Simulated'}
           <span className="muted">
             {lastUpdated ? ` · updated ${lastUpdated.toLocaleTimeString()}` : ' · connecting…'}
           </span>
@@ -67,7 +106,11 @@ export default function Dashboard() {
 
       <main className="main">
         {!selected ? (
-          <div className="empty">Waiting for incidents…</div>
+          <div className="empty">
+            {source === 'live'
+              ? 'No incidents in MongoDB yet. Trigger a crash in the target app, or switch to Simulated.'
+              : 'Waiting for incidents…'}
+          </div>
         ) : (
           <>
             <header className="incident-header">
@@ -87,7 +130,7 @@ export default function Dashboard() {
 
             <StatusPipeline status={selected.status} />
 
-            <GeminiSummary incident={selected} />
+            <GeminiSummary incident={selected} source={source} />
 
             <div className="detail-grid">
               <section className="card">

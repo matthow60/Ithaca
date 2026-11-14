@@ -38,3 +38,9 @@ body { margin: 0; font-family: system-ui, sans-serif; }
 .trace, .diff { overflow-x: auto; font-size: 12px; }
 .diff-add { background: #e6ffed; }
 .diff-del { background: #ffeef0; }
+
+/* Data source toggle (Simulated / Live) */
+.source-toggle { display: flex; margin-bottom: 8px; }
+.source-toggle button { flex: 1; padding: 4px 8px; cursor: pointer; }
+.source-toggle button.active { font-weight: bold; text-decoration: underline; }
+.error { color: red; font-size: 13px; }

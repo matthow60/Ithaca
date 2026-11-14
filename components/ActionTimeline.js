@@ -7,7 +7,8 @@ export default function ActionTimeline({ actions, crashTime, errorMessage }) {
   return (
     <ol className="timeline">
       {actions.map((a, i) => {
-        const offset = ((new Date(a.timestamp).getTime() - crashMs) / 1000).toFixed(1);
+        const diff = (new Date(a.timestamp).getTime() - crashMs) / 1000;
+        const offset = Number.isFinite(diff) ? `${diff.toFixed(1)}s` : '';
         return (
           <li key={i} className="timeline-item">
             <span className="timeline-num">{i + 1}</span>
@@ -16,7 +17,7 @@ export default function ActionTimeline({ actions, crashTime, errorMessage }) {
               {a.target}
               {a.value !== undefined && <code className="timeline-value">"{a.value}"</code>}
             </span>
-            <span className="timeline-offset">{offset}s</span>
+            <span className="timeline-offset">{offset}</span>
           </li>
         );
       })}
