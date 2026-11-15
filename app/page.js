@@ -8,6 +8,7 @@ import ActionTimeline from '../components/ActionTimeline';
 import DiffViewer from '../components/DiffViewer';
 import GeminiSummary from '../components/GeminiSummary';
 import ShaderCanvas from '../components/ShaderCanvas';
+import StarChart from '../components/StarChart';
 import { ColumnIcon, LabyrinthIcon, OwlIcon, SailIcon, ShipIcon } from '../components/Icons';
 
 const POLL_MS = 3000;
@@ -71,6 +72,7 @@ export default function Dashboard() {
       </aside>
 
       <main className="main">
+        <StarChart />
         {!selected ? (
           <div className="empty">
             {error
@@ -97,7 +99,7 @@ export default function Dashboard() {
               )}
             </header>
 
-            <StatusPipeline status={selected.status} />
+            <StatusPipeline status={selected.status} incidentKey={selected._id} />
 
             <GeminiSummary incident={selected} />
 

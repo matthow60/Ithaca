@@ -13,7 +13,8 @@
                    .incident-list .incident-item(.selected) .incident-id .incident-route .incident-time
     Header ....... .incident-header .error-msg .pr-button(.disabled)
     Status ....... .badge .badge-open .badge-reproducing .badge-patching .badge-fixed .badge-failed
-                   .pipeline .pipeline-step(.done/.active/.pending) .pipeline-dot .pipeline-label
+                   .voyage .voyage-sea/-water/-wake/-ship .pipeline .pipeline-step(.done/.active/.pending)
+                   .pipeline-dot .pipeline-label .episode-note .starchart .star .star-line
                    .step-open/.step-reproducing/.step-patching/.step-fixed/.step-failed
     Gemini ....... .gemini .summary-grid .pillar .pillar-abacus .pillar-capital .volute
                    .pillar-echinus .pillar-shaft .pillar-base .pillar-plinth
@@ -51,6 +52,8 @@
   --mono: var(--font-jetbrains), ui-monospace, Menlo, monospace;
 
   --radius: 6px;
+  --sail-time: 1.8s;
+  --sail-ease: cubic-bezier(0.45, 0, 0.2, 1);
   --flat-shadow: 6px 6px 0 var(--shadow);
 
   /* Decorative strips, used as CSS masks so they take any color */
@@ -86,6 +89,30 @@ h1, h2, h3 { font-weight: 600; }
 .shader-canvas { display: block; pointer-events: none; }
 .page-shader { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 0; }
 .card-shader { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+
+/* Star chart behind the top of the main column (components/StarChart.js) */
+.main > * { position: relative; z-index: 1; }
+.main > .starchart {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 190px;
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 60%, transparent);
+  mask: linear-gradient(#000 60%, transparent);
+}
+.star { --low: 0.3; --high: 0.75; fill: var(--marble); opacity: var(--low); animation: twinkle 7s ease-in-out infinite; }
+.star-faint { --low: 0.08; --high: 0.35; }
+.star-bright { --low: 0.6; --high: 0.95; fill: var(--gold); }
+.star-line {
+  stroke: var(--gold);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  opacity: 0.28;
+  animation: chart-in 1.4s ease-out backwards;
+}
 
 /* ---------- Sidebar (with a fluted-column edge) ---------- */
 .sidebar {
@@ -216,7 +243,7 @@ h1, h2, h3 { font-weight: 600; }
 .badge-reproducing, .badge-patching { background: var(--gold); }
 .badge-fixed { background: var(--aegean); }
 
-/* ---------- Incident header (with a wave line underneath) ---------- */
+/* ---------- Incident header (with a faint Greek-key band underneath) ---------- */
 .incident-header {
   position: relative;
   display: flex;
@@ -232,10 +259,11 @@ h1, h2, h3 { font-weight: 600; }
   left: 0;
   right: 0;
   bottom: 0;
-  height: 12px;
-  background: var(--aegean);
-  -webkit-mask: var(--wave) repeat-x left center / auto 100%;
-  mask: var(--wave) repeat-x left center / auto 100%;
+  height: 10px;
+  background: var(--gold);
+  opacity: 0.35;
+  -webkit-mask: var(--meander) repeat-x left center / auto 100%;
+  mask: var(--meander) repeat-x left center / auto 100%;
 }
 .incident-header h1 {
   margin: 2px 0 8px;
@@ -273,79 +301,147 @@ h1, h2, h3 { font-weight: 600; }
   transform: none;
 }
 
-/* ---------- Pipeline: shields joined by a rope ---------- */
-.pipeline { list-style: none; display: flex; margin: 0 0 30px; padding: 0; }
-.pipeline-step {
+/* ---------- Pipeline: a voyage ----------
+   A ship sails along the sea line to the current stage, leaving a teal wake; the stages are ports
+   (round shields) below it. --stops, --at (ship position) and --last come from StatusPipeline.js. */
+.voyage { position: relative; z-index: 2; margin: 0 0 30px; } /* above the Gemini card, for the hover notes */
+.voyage-sea {
   position: relative;
+  height: 44px;
+  margin: 0 calc(50% / var(--stops)); /* from the first port's center to the last one's */
+}
+.voyage-water,
+.voyage-wake {
+  position: absolute;
+  left: 0;
+  bottom: 2px;
+  height: 10px;
+  -webkit-mask: var(--wave) repeat-x 0 center / auto 100%;
+  mask: var(--wave) repeat-x 0 center / auto 100%;
+  animation: tide 5s linear infinite;
+}
+.voyage-water { right: 0; background: var(--ink-line); }
+.voyage-wake {
+  width: calc(100% * var(--at) / var(--last));
+  background: var(--aegean-bright);
+  transition: width var(--sail-time) var(--sail-ease);
+}
+.voyage-wake.is-failed { background: var(--terracotta); }
+.voyage-ship {
+  position: absolute;
+  bottom: 9px;
+  left: calc(100% * var(--at) / var(--last));
+  color: var(--gold);
+  transform: translateX(-50%);
+  transition: left var(--sail-time) var(--sail-ease), color 0.6s;
+}
+.voyage-ship svg {
+  display: block;
+  stroke-width: 1.9;
+  filter: drop-shadow(2px 2px 0 var(--shadow));
+  animation: ship-bob 2.6s ease-in-out infinite;
+}
+.voyage-ship.docked { color: var(--foam); }
+.voyage-ship.docked svg { animation-duration: 4.5s; }
+.voyage-ship.wrecked { color: var(--terracotta); }
+.voyage-ship.wrecked svg { animation: none; transform: translateY(5px) rotate(-16deg); }
+.voyage.is-instant .voyage-wake,
+.voyage.is-instant .voyage-ship { transition: none; }
+
+.pipeline { list-style: none; display: flex; margin: 10px 0 0; padding: 0; }
+.pipeline-step {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   text-align: center;
   font-family: var(--display);
   font-size: 17px;
   font-weight: 700;
   color: var(--muted);
+  transition: color 0.6s;
 }
-.pipeline-step::before {
-  content: '';
-  position: absolute;
-  top: 25px;
-  left: -50%;
-  right: 50%;
-  height: 4px;
-  background: var(--ink-line);
-}
-.pipeline-step:first-child::before { display: none; }
 .pipeline-dot {
-  position: relative;
-  z-index: 1;
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 54px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   background: var(--ink-raised);
   color: var(--muted);
   /* concentric rings, like the round shields on the ship, plus a flat drop shadow */
-  box-shadow: inset 0 0 0 3px var(--ink-line), inset 0 0 0 8px var(--ink-raised),
-    inset 0 0 0 10px var(--ink-line), 4px 4px 0 var(--shadow);
+  box-shadow: inset 0 0 0 2px var(--ink-line), inset 0 0 0 6px var(--ink-raised),
+    inset 0 0 0 8px var(--ink-line), 3px 3px 0 var(--shadow);
+  transition: background-color 0.6s, color 0.6s, box-shadow 0.6s;
 }
-.pipeline-dot svg { width: 22px; height: 22px; }
+.pipeline-dot svg { width: 18px; height: 18px; }
+.pipeline-step { position: relative; cursor: default; outline-offset: 6px; border-radius: 8px; }
+
+/* Hover / focus notes: one line from the episode each stage stands for */
+.episode-note {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 10px);
+  left: 50%;
+  width: max-content;
+  max-width: 230px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--ink-line);
+  border-radius: var(--radius);
+  background: var(--ink-deep);
+  box-shadow: 4px 4px 0 var(--shadow);
+  color: var(--marble);
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -4px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.episode-note em { display: block; font-style: italic; }
+.episode-book {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--body);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.pipeline-step:hover .episode-note,
+.pipeline-step:focus-visible .episode-note { opacity: 1; transform: translate(-50%, 0); }
+.pipeline-step:first-child .episode-note { left: 0; transform: translate(0, -4px); }
+.pipeline-step:first-child:hover .episode-note,
+.pipeline-step:first-child:focus-visible .episode-note { transform: translate(0, 0); }
+.pipeline-step:last-child .episode-note { left: auto; right: 0; transform: translate(0, -4px); }
+.pipeline-step:last-child:hover .episode-note,
+.pipeline-step:last-child:focus-visible .episode-note { transform: translate(0, 0); }
 
 .pipeline-step.done { color: var(--foam); }
-.pipeline-step.done::before,
-.pipeline-step.active.step-fixed::before { background: var(--aegean); }
-.pipeline-step.done .pipeline-dot,
-.pipeline-step.active.step-fixed .pipeline-dot {
+.pipeline-step.done .pipeline-dot {
   background: var(--aegean);
   color: var(--ink-text);
-  box-shadow: inset 0 0 0 3px var(--aegean-deep), inset 0 0 0 8px var(--aegean),
-    inset 0 0 0 10px var(--marble), 4px 4px 0 var(--shadow);
+  box-shadow: inset 0 0 0 2px var(--aegean-deep), inset 0 0 0 6px var(--aegean),
+    inset 0 0 0 8px var(--marble), 3px 3px 0 var(--shadow);
 }
-
 .pipeline-step.active { color: var(--gold); }
-.pipeline-step.active::before { background: var(--gold); }
 .pipeline-step.active .pipeline-dot {
   background: var(--gold);
   color: var(--ink-text);
-  box-shadow: inset 0 0 0 3px var(--gold-deep), inset 0 0 0 8px var(--gold),
-    inset 0 0 0 10px var(--ink-text), 4px 4px 0 var(--shadow);
-  animation: shield-bob 1.6s ease-in-out infinite;
+  box-shadow: inset 0 0 0 2px var(--gold-deep), inset 0 0 0 6px var(--gold),
+    inset 0 0 0 8px var(--ink-text), 3px 3px 0 var(--shadow);
 }
-/* Finished: calm, no motion */
-.pipeline-step.active.step-fixed { color: var(--foam); }
-.pipeline-step.active.step-fixed .pipeline-dot { animation: none; }
-
 .pipeline-step.step-failed { color: var(--terracotta); }
-.pipeline-step.step-failed::before { background: var(--terracotta); }
 .pipeline-step.step-failed .pipeline-dot {
   background: var(--terracotta);
   color: var(--ink-text);
-  box-shadow: inset 0 0 0 3px #c75a2c, inset 0 0 0 8px var(--terracotta),
-    inset 0 0 0 10px var(--ink-text), 4px 4px 0 var(--shadow);
-  animation: none;
+  box-shadow: inset 0 0 0 2px #c75a2c, inset 0 0 0 6px var(--terracotta),
+    inset 0 0 0 8px var(--ink-text), 3px 3px 0 var(--shadow);
 }
 
 /* ---------- Cards ---------- */
@@ -393,49 +489,55 @@ h1, h2, h3 { font-weight: 600; }
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 30px 44px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 30px 56px;
   align-items: stretch;
-  padding: 6px 16px 4px;
+  padding: 6px 22px 4px;
 }
+/* Slim Ionic columns in a deep teal, with light text. */
 .pillar {
+  --stone: #0d5f58;
+  --stone-light: #13756c;
+  --stone-dark: #08433e;
+  --groove: rgba(160, 217, 211, 0.22);
   display: flex;
   flex-direction: column;
 }
-.pillar-abacus { height: 12px; margin: 0 -8px; background: var(--aegean); }
-.pillar-capital { display: flex; align-items: center; height: 40px; margin: 0 -16px; }
-.volute { flex: none; width: 40px; height: 40px; }
-.volute circle { fill: var(--aegean); }
-.volute path { fill: none; stroke: var(--marble); stroke-width: 1.7; stroke-linecap: round; }
+.pillar-abacus { height: 7px; margin: 0 -6px; background: var(--stone-light); }
+.pillar-capital { display: flex; align-items: center; height: 28px; margin: 0 -12px; }
+.volute { flex: none; width: 28px; height: 28px; }
+.volute circle { fill: var(--stone-light); }
+.volute path { fill: none; stroke: var(--foam); stroke-width: 1.6; stroke-linecap: round; }
 .pillar-echinus {
   flex: 1;
-  height: 24px;
+  height: 15px;
   margin: 0 -2px;
-  background: var(--aegean);
-  border-top: 2px solid var(--marble);
-  border-bottom: 2px solid var(--marble);
+  background: var(--stone-light);
+  border-top: 1.5px solid var(--foam);
+  border-bottom: 1.5px solid var(--foam);
 }
 .pillar-shaft {
   flex: 1;
-  margin: 0 6px;
-  padding: 18px 34px 22px;
-  /* fluting: white grooves down both edges (like the key art), clear center for text */
+  margin: 0 8px;
+  padding: 16px 24px 20px;
+  /* fluting: thin grooves down both edges, clear center for text */
   background:
-    repeating-linear-gradient(90deg, rgba(251, 247, 242, 0.55) 0 2px, transparent 2px 8px) left top / 24px 100% no-repeat,
-    repeating-linear-gradient(270deg, rgba(251, 247, 242, 0.55) 0 2px, transparent 2px 8px) right top / 24px 100% no-repeat,
-    var(--aegean);
-  color: var(--ink-text);
+    repeating-linear-gradient(90deg, var(--groove) 0 1.5px, transparent 1.5px 6px) left top / 14px 100% no-repeat,
+    repeating-linear-gradient(270deg, var(--groove) 0 1.5px, transparent 1.5px 6px) right top / 14px 100% no-repeat,
+    var(--stone);
+  color: #e4f1ef;
 }
 .pillar-shaft h3 {
   margin: 0 0 8px;
   font-family: var(--display);
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 700;
   line-height: 1.15;
+  color: var(--gold);
 }
-.pillar-shaft p { margin: 0; font-size: 14px; font-weight: 500; line-height: 1.55; }
-.pillar-base { height: 10px; margin: 0; background: var(--aegean); border-top: 2px solid var(--marble); }
-.pillar-plinth { height: 14px; margin: 0 -10px; background: var(--aegean-deep); }
+.pillar-shaft p { margin: 0; font-size: 13.5px; font-weight: 400; line-height: 1.6; }
+.pillar-base { height: 6px; background: var(--stone-light); border-top: 1.5px solid var(--foam); }
+.pillar-plinth { height: 9px; margin: 0 -8px; background: var(--stone-dark); }
 
 /* ---------- User journey timeline ---------- */
 .timeline { position: relative; list-style: none; margin: 0; padding: 0; }
@@ -547,9 +649,19 @@ h1, h2, h3 { font-weight: 600; }
   0% { box-shadow: 0 0 0 0 rgba(47, 194, 180, 0.7); }
   70%, 100% { box-shadow: 0 0 0 9px rgba(47, 194, 180, 0); }
 }
-@keyframes shield-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-4px); }
+@keyframes ship-bob {
+  0%, 100% { transform: translateY(0) rotate(-2deg); }
+  50% { transform: translateY(-3px) rotate(2deg); }
+}
+@keyframes tide {
+  to { -webkit-mask-position: -40px center; mask-position: -40px center; } /* one wave tile */
+}
+@keyframes twinkle {
+  0%, 100% { opacity: var(--low); }
+  50% { opacity: var(--high); }
+}
+@keyframes chart-in {
+  from { opacity: 0; }
 }
 @keyframes breathe {
   0%, 100% { opacity: 0.55; }
@@ -570,9 +682,12 @@ h1, h2, h3 { font-weight: 600; }
   .main { padding: 22px 16px 80px; }
   .incident-header { flex-direction: column; }
   .pipeline-step { font-size: 13px; }
-  .pipeline-dot { width: 42px; height: 42px; }
-  .pipeline-dot svg { width: 18px; height: 18px; }
-  .pipeline-step::before { top: 19px; }
+  .pipeline-dot { width: 36px; height: 36px; }
+  .pipeline-dot svg { width: 16px; height: 16px; }
+  .voyage-sea { height: 38px; }
+  .voyage-ship svg { width: 24px; height: 24px; }
+  .episode-note { max-width: 180px; font-size: 13.5px; }
+  .main > .starchart { height: 150px; opacity: 0.55; }
   .summary-grid { padding: 6px 14px 4px; }
   .timeline-item { grid-template-columns: 28px auto minmax(0, 1fr); }
   .timeline-offset { display: none; }
