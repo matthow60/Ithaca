@@ -2,6 +2,7 @@ import './env.js'; // shared repo-root .env
 import express from 'express';
 import { connectDb, dbName, incidents, resetIncident } from './db.js';
 import { runIncident } from './pipeline.js';
+import * as live from './live.js';
 
 const PORT = Number(process.env.PORT || 4000);
 const LLM_MODE = () => (process.env.LLM_MODE || 'mock').toLowerCase();
@@ -23,12 +24,16 @@ async function drain() {
   if (current) return;
   while (queue.length) {
     current = queue.shift();
+    live.startRun(current);
+    let result = {};
     try {
-      await runIncident(current);
+      await live.pace(live.PACE.detectMs); // demo pacing: let "Crash Detected" show before claiming
+      result = (await runIncident(current)) ?? {};
     } catch (err) {
       // runIncident records its own failures; this only catches e.g. Mongo being down during claim.
       console.error(`[${current}] unhandled pipeline error:`, err);
     } finally {
+      live.endRun(current, result);
       pending.delete(current);
       current = null;
     }
@@ -40,8 +45,11 @@ const app = express();
 app.use(express.json());
 
 app.get('/health', (_req, res) => {
-  res.json({ ok: true, llmMode: LLM_MODE(), running: current, queued: queue.length });
+  res.json({ ok: true, llmMode: LLM_MODE(), running: current, queued: queue.length, pacing: live.PACE.enabled });
 });
+
+// Live event stream for the dashboard's "Live Journey" window (Server-Sent Events).
+app.get('/live', live.liveHandler);
 
 app.post('/incidents/:id/fix', (req, res) => {
   const accepted = enqueue(req.params.id);
@@ -94,5 +102,7 @@ function watchIncidents() {
 // ─── Boot ────────────────────────────────────────────────────────────────────
 await connectDb();
 console.log(`connected to Mongo db "${dbName()}"`);
-app.listen(PORT, () => console.log(`patcher listening on :${PORT} (LLM_MODE=${LLM_MODE()})`));
+app.listen(PORT, () =>
+  console.log(`patcher listening on :${PORT} (LLM_MODE=${LLM_MODE()}${live.PACE.enabled ? ', DEMO_PACING on' : ''})`),
+);
 watchIncidents();

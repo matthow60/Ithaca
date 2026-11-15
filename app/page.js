@@ -6,6 +6,7 @@ import IncidentList from '../components/IncidentList';
 import StatusPipeline from '../components/StatusPipeline';
 import ActionTimeline from '../components/ActionTimeline';
 import DiffViewer from '../components/DiffViewer';
+import LiveJourney from '../components/LiveJourney';
 import GeminiSummary from '../components/GeminiSummary';
 import ShaderCanvas from '../components/ShaderCanvas';
 import { ColumnIcon, LabyrinthIcon, OwlIcon, SailIcon, ShipIcon } from '../components/Icons';
@@ -114,22 +115,25 @@ export default function Dashboard() {
                 />
               </section>
 
-              <div className="stack">
-                <section className="card">
-                  <h2>
-                    <LabyrinthIcon />
-                    Stack Trace
-                  </h2>
-                  <pre className="trace">{selected.stackTrace}</pre>
-                </section>
-                <section className="card">
-                  <h2>
-                    <OwlIcon />
-                    Gemini Patch <span className="muted">code diff</span>
-                  </h2>
-                  <DiffViewer diff={selected.codeDiff} />
-                </section>
-              </div>
+              {/* Live view of the engine at work (patcher GET /live). */}
+              <LiveJourney incident={selected} />
+            </div>
+
+            <div className="detail-grid">
+              <section className="card">
+                <h2>
+                  <LabyrinthIcon />
+                  Stack Trace
+                </h2>
+                <pre className="trace">{selected.stackTrace}</pre>
+              </section>
+              <section className="card">
+                <h2>
+                  <OwlIcon />
+                  Gemini Patch <span className="muted">code diff</span>
+                </h2>
+                <DiffViewer diff={selected.codeDiff} />
+              </section>
             </div>
           </>
         )}

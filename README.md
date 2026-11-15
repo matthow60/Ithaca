@@ -137,6 +137,15 @@ npm start
    [incident-…] ✅ fixed in 41000ms → https://github.com/…/pull/…
    ```
 3. Watch the **dashboard**. The incident moves through Crash Detected → Reproducing Steps → AI Patching → PR Ready.
+   The **Live Journey** window shows the engine at work as it happens:
+   - the headless browser retracing the user's steps, with a cursor on each click and a `Step 5/6` caption
+   - the broken file with the crashing line highlighted while Gemini writes the fix
+   - the same steps replayed on the fixed code, then a "Pull request opened" card
+
+   It streams straight from the engine (`http://localhost:4000/live`), so the engine and dashboard
+   must run on the same machine. Set `DEMO_PACING=1` in `.env` to slow the run down for an audience:
+   each stage stays up for at least 3.5 s, so the progress bar keeps pace, and the bot pauses before
+   every click. A full run then takes about 1.5–2 minutes. Use `DEMO_PACING=0` for full speed.
 4. Open the **PR** on GitHub. It contains the error, how it was reproduced, a before/after screenshot
    for each user step, and the diff.
 

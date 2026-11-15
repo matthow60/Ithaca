@@ -1,4 +1,5 @@
 import { MongoClient } from 'mongodb';
+import * as live from './live.js';
 
 let client;
 let db;
@@ -33,16 +34,23 @@ export function incidents() {
  * Returns the claimed document, or null if it doesn't exist / was already claimed.
  */
 export async function claimIncident(incidentId) {
-  return incidents().findOneAndUpdate(
+  await live.holdPhase('reproducing');
+  const doc = await incidents().findOneAndUpdate(
     { incidentId, status: 'open' },
     { $set: { status: 'reproducing', claimedAt: new Date() } },
     { returnDocument: 'after' },
   );
+  if (doc) live.status(incidentId, 'reproducing');
+  return doc;
 }
 
 /** $set the given fields (dot paths allowed, e.g. { 'fix.error': '...' }). */
 export async function updateIncident(incidentId, set) {
-  return incidents().updateOne({ incidentId }, { $set: { ...set, updatedAt: new Date() } });
+  // Status changes are mirrored to the live window (and paced when DEMO_PACING is on).
+  if (set.status) await live.holdPhase(set.status);
+  const res = await incidents().updateOne({ incidentId }, { $set: { ...set, updatedAt: new Date() } });
+  if (set.status) live.status(incidentId, set.status);
+  return res;
 }
 
 /** Put an incident back to "open" with no fix, for demo re-runs. Returns true if found. */

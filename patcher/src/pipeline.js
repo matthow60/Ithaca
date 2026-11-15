@@ -11,6 +11,7 @@ import { generatePatch } from './llm.js';
 import { resolveCrashLocation } from './stack.js';
 import { reproduce, prove } from './verify.js';
 import { commitAndPush, openPullRequest, buildPrBody } from './github.js';
+import * as live from './live.js';
 
 export const MAX_ATTEMPTS = 3;
 
@@ -40,6 +41,7 @@ export async function runIncident(incidentId) {
     log(`crash location: ${filePath}:${line ?? '?'} (from ${from})`);
     const original = await log.step(`read ${filePath}`, () => readRepoFile(dir, filePath));
     const crashLine = line > 0 ? original.split(/\r?\n/)[line - 1] ?? null : null;
+    live.focusFile(filePath, line, original); // live view: show the file + crashing line
 
     const actions = incident.actions || [];
     const evidenceRelDir = `.autofix/${safeId(incidentId)}`;
