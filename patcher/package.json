@@ -12,7 +12,8 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "seed": "node scripts/seed.js",
-    "postinstall": "playwright install chromium"
+    "postinstall": "playwright install chromium",
+    "test": "node --test test/"
   },
   "dependencies": {
     "@octokit/rest": "^21.0.2",

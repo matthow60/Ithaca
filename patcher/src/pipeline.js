@@ -97,9 +97,13 @@ export async function runIncident(incidentId) {
 
       await updateIncident(incidentId, { status: 'verifying', 'fix.attempts': attempts });
       const result = await log.step(`prove fix (replay user steps on patched code, attempt ${attempts}/${MAX_ATTEMPTS})`, () =>
-        prove({ dir, actions, request: incident.request, evidenceDir }),
+        prove({ dir, actions, request: incident.request, evidenceDir, reproduction, route: incident.route }),
       );
       if (result.browserError) log(`⚠ ${result.browserError}`);
+      if (result.target) log(`verifying target crash ${result.target.label} (from ${result.target.from})`);
+      for (const e of result.knownErrors ?? []) {
+        log(`⚠ ignoring ${e.status} on ${e.method} ${e.url}: it fails on the original code too (separate bug)`);
+      }
 
       if (result.passed) {
         logSteps(log, 'after', result.browser);
@@ -188,6 +192,8 @@ function summarize(r) {
     requestStatus: r.http?.status ?? null,
     browserError: r.browserError ?? null,
     serverErrors: r.browser?.serverErrors ?? [],
+    target: r.target?.label ?? null,
+    knownErrors: r.knownErrors ?? [],
     steps: (r.browser?.steps ?? []).map(({ step, type, target, ok, error, serverErrors, screenshot }) =>
       ({ step, type, target, ok, error, serverErrors, screenshot })),
   };

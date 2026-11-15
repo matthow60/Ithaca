@@ -103,12 +103,21 @@ export function buildPrBody({ incident, codeDiff, patchSource, attempts, reprodu
   lines.push('');
   lines.push('### Fix verified');
   const afterSteps = proof.browser?.steps;
+  const known = proof.knownErrors || [];
+  const target = proof.target ? ` on \`${proof.target.label}\`` : '';
   if (afterSteps) {
     const okCount = afterSteps.filter((s) => s.ok).length;
-    lines.push(`Replayed the same steps against the **patched** code: **no 5xx responses**, ${okCount}/${afterSteps.length} steps completed` +
+    const result = known.length ? `**the crash${target} is gone** and no new errors appeared` : '**no 5xx responses**';
+    lines.push(`Replayed the same steps against the **patched** code: ${result}, ${okCount}/${afterSteps.length} steps completed` +
       `${proof.http ? `, request replay returned **${proof.http.status}**` : ''} (attempt ${attempts}).`);
   } else {
     lines.push(`Replayed \`${req.method || 'GET'} ${req.path}\` against the patched code: **${proof.http?.status}** (attempt ${attempts}).`);
+  }
+  if (known.length) {
+    const list = [...new Set(known.map((e) => `\`${e.method} ${e.url}\` (${e.status})`))].join(', ');
+    lines.push('');
+    lines.push(`> [!NOTE]\n> ${list} also fails on the **original** code with these steps. ` +
+      'That is a separate, existing bug, not caused by this patch, so it was ignored when verifying this fix.');
   }
   lines.push('');
 
