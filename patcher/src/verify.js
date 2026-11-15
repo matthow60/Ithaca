@@ -56,8 +56,11 @@ export async function prove({ dir, actions, request, evidenceDir }) {
   try {
     // Browser replay first, on a fresh app, so the screenshots show exactly what the user did
     // (a request replay first would leave state behind, e.g. extra items in a cart).
+    // Declare every result variable up front: an early `return` that mentions one declared
+    // further down throws "Cannot access 'x' before initialization" and hides the real reason.
     let browser = null;
     let browserError = null;
+    let http = null;
     if (actions?.length) {
       try {
         browser = await replayActions({ baseUrl: app.baseUrl, actions, outDir: evidenceDir, label: 'after' });
@@ -76,7 +79,6 @@ export async function prove({ dir, actions, request, evidenceDir }) {
       }
     }
 
-    let http = null;
     if (request?.path) {
       http = await replayRequest(app.baseUrl, request);
       if (http.status >= 500) {

@@ -82,6 +82,14 @@ keys are removed from the environment the target app runs with.
      auto-generated selectors like `div > span:nth-child(3)` break.
    - `url`: the page the action happened on. Any host/port is fine; only path + query are used.
 
+## Tests
+
+```bash
+npm test    # boots a tiny fixture app and runs reproduce()/prove() in headless Chromium (~10s)
+```
+
+Run it before pushing changes to `src/verify.js` or `src/replay.js`. No Mongo, GitHub or LLM needed.
+
 ## Run it locally (mock mode)
 
 ```bash
