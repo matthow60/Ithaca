@@ -1,4 +1,5 @@
 import { MongoClient } from 'mongodb';
+import * as live from './live.js';
 
 let client;
 let db;
@@ -33,23 +34,30 @@ export function incidents() {
  * Returns the claimed document, or null if it doesn't exist / was already claimed.
  */
 export async function claimIncident(incidentId) {
-  return incidents().findOneAndUpdate(
+  const doc = await incidents().findOneAndUpdate(
     { incidentId, status: 'open' },
-    { $set: { status: 'reproducing', claimedAt: new Date() } },
+    // claimedBy lets dashboards tell whether THEIR engine (with its live view) has this incident.
+    { $set: { status: 'reproducing', claimedAt: new Date(), claimedBy: live.ENGINE } },
     { returnDocument: 'after' },
   );
+  if (doc) live.startRun(incidentId, 'reproducing'); // live channel only for incidents we actually won
+  return doc;
 }
 
 /** $set the given fields (dot paths allowed, e.g. { 'fix.error': '...' }). */
 export async function updateIncident(incidentId, set) {
-  return incidents().updateOne({ incidentId }, { $set: { ...set, updatedAt: new Date() } });
+  // Status changes are mirrored to the live window (and paced when DEMO_PACING is on).
+  if (set.status) await live.holdPhase(incidentId, set.status);
+  const res = await incidents().updateOne({ incidentId }, { $set: { ...set, updatedAt: new Date() } });
+  if (set.status) live.status(incidentId, set.status);
+  return res;
 }
 
 /** Put an incident back to "open" with no fix, for demo re-runs. Returns true if found. */
 export async function resetIncident(incidentId) {
   const res = await incidents().updateOne(
     { incidentId },
-    { $set: { status: 'open', updatedAt: new Date() }, $unset: { fix: '', claimedAt: '' } },
+    { $set: { status: 'open', updatedAt: new Date() }, $unset: { fix: '', claimedAt: '', claimedBy: '' } },
   );
   return res.matchedCount > 0;
 }

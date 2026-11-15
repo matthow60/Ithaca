@@ -1,9 +1,17 @@
 // Small logging helpers shared by the pipeline steps.
+import * as live from './live.js';
 
 export function makeLogger(incidentId) {
   const prefix = `[${incidentId}]`;
-  const log = (...args) => console.log(prefix, ...args);
-  log.error = (...args) => console.error(prefix, ...args);
+  // Every log line also goes to the dashboard's live window.
+  const log = (...args) => {
+    console.log(prefix, ...args);
+    live.log(incidentId, 'info', args.join(' '));
+  };
+  log.error = (...args) => {
+    console.error(prefix, ...args);
+    live.log(incidentId, 'error', args.join(' '));
+  };
 
   /** Run fn as a named step, logging start, duration, and failure. */
   log.step = async (name, fn) => {
