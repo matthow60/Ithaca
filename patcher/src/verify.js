@@ -42,16 +42,28 @@ export async function reproduce({ dir, actions, request, evidenceDir }) {
 }
 
 /**
- * Prove the patched code no longer crashes: the user's steps in a browser, then the raw request.
- * @returns {{ passed: boolean, error?: string, http, browser, browserError }}
+ * Prove the patched code fixed THE crash we were asked to fix, without breaking anything new.
+ * Replays the user's steps in a browser, then the raw request, and sorts every 5xx it sees:
+ *   target — the incident's own crash is still there       → fail
+ *   new    — a 5xx the original code didn't produce        → fail (the patch broke something)
+ *   known  — a 5xx the original code produced too, on a
+ *            different endpoint (a separate, existing bug) → ignored, reported as knownErrors
+ * Without `reproduction` there is nothing to compare against, so every 5xx fails.
+ *
+ * @param {object} [opts.reproduction] result of reproduce() on the original code
+ * @param {string} [opts.route]        incident.route, e.g. "POST /checkout/split"
+ * @returns {{ passed: boolean, error?: string, http, browser, browserError, target, knownErrors }}
  *   error is human-readable and is fed back to the next patch attempt.
  */
-export async function prove({ dir, actions, request, evidenceDir }) {
+export async function prove({ dir, actions, request, evidenceDir, reproduction = null, route = null }) {
+  const target = reproduction ? findTarget({ request, route, reproduction }) : null;
+  const before = reproduction?.browser?.serverErrors ?? [];
+
   let app;
   try {
     app = await startApp(dir);
   } catch (err) {
-    return { passed: false, error: err.message };
+    return { passed: false, error: err.message, target, knownErrors: [] };
   }
   try {
     // Browser replay first, on a fresh app, so the screenshots show exactly what the user did
@@ -67,38 +79,119 @@ export async function prove({ dir, actions, request, evidenceDir }) {
       } catch (err) {
         browserError = `Browser replay failed: ${err.message}`;
       }
-      if (browser?.crashed) {
-        const e = browser.serverErrors[0];
-        return {
-          passed: false,
-          http,
-          browser,
-          error: `Replaying the user's steps still hit ${e.status} on ${e.method} ${e.url} at step ${e.step}.\n` +
-            `--- app output ---\n${redact(app.output())}`,
-        };
-      }
     }
+    const after = [...(browser?.serverErrors ?? [])];
 
     if (request?.path) {
       http = await replayRequest(app.baseUrl, request);
       if (http.status >= 500) {
         await sleep(200); // let the app flush its error log
-        return {
-          passed: false,
-          http,
-          browser,
-          error: `Replayed ${request.method || 'GET'} ${request.path} still returned ${http.status}.\n` +
-            `--- response body ---\n${http.body}\n--- app output ---\n${redact(app.output())}`,
-        };
+        after.push({ step: 'request replay', status: http.status, method: (request.method || 'GET').toUpperCase(), url: request.path });
       }
     }
-    return { passed: true, http, browser, browserError };
+
+    const { targetErrors, newErrors, knownErrors } = classifyServerErrors({ after, before, target });
+    if (!targetErrors.length && !newErrors.length) {
+      return { passed: true, http, browser, browserError, target, knownErrors };
+    }
+
+    const lines = [];
+    for (const e of targetErrors) {
+      lines.push(`The crash being fixed is still there: ${e.status} on ${e.method} ${e.url} (${where(e)}).`);
+    }
+    for (const e of newErrors) {
+      lines.push(`The patch introduced a new error: ${e.status} on ${e.method} ${e.url} (${where(e)}); the original code did not fail there.`);
+    }
+    if (knownErrors.length) {
+      lines.push(`Ignore these; they also fail on the original code and are a separate bug: ` +
+        `${unique(knownErrors).join(', ')}.`);
+    }
+    const body = http && http.status >= 500 ? `--- response body ---\n${http.body}\n` : '';
+    return {
+      passed: false,
+      http,
+      browser,
+      browserError,
+      target,
+      knownErrors,
+      error: `${lines.join('\n')}\n${body}--- app output ---\n${redact(app.output())}`,
+    };
   } catch (err) {
-    return { passed: false, error: `Replay failed: ${err.message}\n--- app output ---\n${redact(app.output())}` };
+    return { passed: false, target, knownErrors: [], error: `Replay failed: ${err.message}\n--- app output ---\n${redact(app.output())}` };
   } finally {
     await app.stop();
   }
 }
+
+/**
+ * Which endpoint is the incident's crash? First match wins:
+ *   1. the recorded request (method + path)
+ *   2. incident.route; matched by method + path suffix, since routes are often stored without
+ *      the mount prefix ("POST /checkout/split" vs "/api/checkout/split")
+ *   3. the last 5xx in the reproduction: the error the user actually ran into
+ * 1 and 2 only count if the reproduction actually saw that crash (or reproduced via the request).
+ * @returns {{ method: string|null, path: string, from: 'request'|'route'|'reproduction', label: string } | null}
+ */
+export function findTarget({ request, route, reproduction }) {
+  const seen = reproduction?.browser?.serverErrors ?? [];
+  const candidates = [];
+  if (request?.path) {
+    candidates.push({ method: (request.method || 'GET').toUpperCase(), path: pathOnly(request.path), from: 'request' });
+  }
+  const m = String(route ?? '').trim().match(/^([A-Za-z]+)\s+(\/\S*)$/);
+  if (m) candidates.push({ method: m[1].toUpperCase(), path: pathOnly(m[2]), from: 'route' });
+
+  for (const c of candidates) {
+    const confirmed = seen.some((e) => matchesTarget(e, c)) || (c.from === 'request' && reproduction?.by === 'request');
+    if (confirmed) return { ...c, label: `${c.method} ${c.path}` };
+  }
+  const last = seen.at(-1);
+  if (last) {
+    const path = pathOnly(last.url);
+    return { method: last.method.toUpperCase(), path, from: 'reproduction', label: `${last.method.toUpperCase()} ${path}` };
+  }
+  const fallback = candidates[0];
+  return fallback ? { ...fallback, label: `${fallback.method} ${fallback.path}` } : null;
+}
+
+/** Does a 5xx ({ method, url }) belong to the target endpoint? */
+export function matchesTarget(error, target) {
+  if (!target) return false;
+  if (target.method && error.method?.toUpperCase() !== target.method) return false;
+  const path = pathOnly(error.url);
+  if (path === target.path) return true;
+  // Routes may lack the mount prefix: "/api/checkout/split" matches route "/checkout/split".
+  // target.path starts with "/", so endsWith() only matches on a segment boundary.
+  return target.from === 'route' && target.path !== '/' && path.endsWith(target.path);
+}
+
+/**
+ * Sort the 5xx responses seen on the patched code against those seen on the original code.
+ * With no target (nothing to compare against), every 5xx counts as target.
+ */
+export function classifyServerErrors({ after, before, target }) {
+  const targetErrors = [];
+  const newErrors = [];
+  const knownErrors = [];
+  const existing = new Set(before.map(key));
+  for (const e of after) {
+    if (!target || matchesTarget(e, target)) targetErrors.push(e);
+    else if (existing.has(key(e))) knownErrors.push(e);
+    else newErrors.push(e);
+  }
+  return { targetErrors, newErrors, knownErrors };
+}
+
+const pathOnly = (url) => {
+  try {
+    return new URL(url, 'http://x').pathname.replace(/\/+$/, '') || '/';
+  } catch {
+    return String(url);
+  }
+};
+const key = (e) => `${String(e.method).toUpperCase()} ${pathOnly(e.url)}`;
+const unique = (errors) => [...new Set(errors.map((e) => `${e.status} on ${key(e)}`))];
+const where = (e) => (typeof e.step === 'number' ? `step ${e.step} of the user's steps` : e.step);
 
 /** Start TARGET_START_CMD on a free port; resolves once it answers HTTP. */
 export async function startApp(dir, startCmd = process.env.TARGET_START_CMD || 'node server/index.js') {

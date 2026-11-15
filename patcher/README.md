@@ -5,7 +5,9 @@ Takes a crash recorded in MongoDB — stack trace **plus the user's last 15 step
 1. **Reproduces** it: boots the original app and replays the user's steps in a headless browser,
    screenshotting every step, until the 500 shows up.
 2. **Patches** the broken file (found from the stack trace).
-3. **Proves** the fix: boots the patched app and replays the *same* steps — no 5xx allowed.
+3. **Proves** the fix: boots the patched app and replays the *same* steps. The incident's own crash
+   must be gone and no *new* 5xx may appear. A 5xx that the original code also produced on a
+   different endpoint (a separate, existing bug) is ignored and noted in the PR.
 4. Opens a **GitHub PR** with the diff and a before/after screenshot for every step, and updates the
    incident in MongoDB.
 
@@ -21,7 +23,7 @@ REPRODUCE  original code, replay user steps in Chromium → 📸 before-NN.png  
 generatePatch() → write file                                                   (status: patching)
    ▼
 PROVE      patched code, replay same steps → 📸 after-NN.png, + request replay (status: verifying)
-   │ still 5xx → retry with previousAttemptError (max 3) → status: failed
+   │ target crash still there, or a new 5xx → retry with previousAttemptError (max 3) → status: failed
    ▼
 commit fix  +  commit .autofix/<id>/*.png  → push fix/<id> → PR               (status: fixed)
 ```
@@ -85,7 +87,7 @@ keys are removed from the environment the target app runs with.
 ## Tests
 
 ```bash
-npm test    # boots a tiny fixture app and runs reproduce()/prove() in headless Chromium (~10s)
+npm test    # boots a tiny fixture app and runs reproduce()/prove() in headless Chromium (~20s)
 ```
 
 Run it before pushing changes to `src/verify.js` or `src/replay.js`. No Mongo, GitHub or LLM needed.
