@@ -1,14 +1,17 @@
 'use client';
 
-// "Live Journey": watch the AutoFix engine work in real time.
-// Connects to the engine's Server-Sent Events stream (patcher/src/live.js, GET /live) and shows:
+// "Live Journey": watch the AutoFix engine fix THIS incident in real time.
+// Subscribes to the selected incident's own channel on the local engine
+// (patcher/src/live.js, GET /live?incident=<id>) and shows:
 //   - the replay browser as it retraces the user's steps (live frames, drawn cursor)
 //   - the broken file + crashing line while Gemini writes the fix
 //   - a scene card for the other phases, and the result (PR link) at the end
 //   - a ticker of the engine's latest log lines
+// If another engine (a teammate's laptop) claimed the incident, there's no stream to show here:
+// the card says it's "A Different Odyssey" instead.
 import { useEffect, useReducer } from 'react';
 import styles from './LiveJourney.module.css';
-import { CompassIcon, OwlIcon, ShipIcon, StormIcon, WaveIcon } from './Icons';
+import { CompassIcon, OwlIcon, SailIcon, ShipIcon, StormIcon, WaveIcon } from './Icons';
 
 // Inlined at build time (NEXT_PUBLIC_*). The engine runs on the same machine by default.
 const ENGINE_URL = process.env.NEXT_PUBLIC_ENGINE_URL || 'http://localhost:4000';
@@ -16,7 +19,9 @@ const TICKER_LINES = 4;
 
 const SCENES = {
   idle: { Icon: CompassIcon, title: 'Calm seas', text: 'Waiting for the next crash to wash ashore.' },
-  open: { Icon: StormIcon, title: 'Crash detected', text: 'A new incident has arrived. Readying the ship…' },
+  open: { Icon: StormIcon, title: 'Crash detected', text: 'Waiting for an engine to set sail…' },
+  elsewhere: { Icon: SailIcon, title: 'A Different Odyssey', text: 'This voyage is being sailed by another crew’s engine.' },
+  unwatched: { Icon: CompassIcon, title: 'Voyage under way', text: 'Your engine took this voyage before the window was watching. The progress bar above shows where it is.' },
   reproducing: { Icon: CompassIcon, title: 'Charting the course', text: 'Cloning the repo and preparing to retrace the user’s steps…' },
   patching: { Icon: OwlIcon, title: 'Gemini is writing the fix', text: 'Reading the broken file and the user’s journey…' },
   verifying: { Icon: CompassIcon, title: 'Proving the fix', text: 'Replaying the same steps on the patched code…' },
@@ -27,17 +32,19 @@ const SCENES = {
 
 const REPLAY_TAG = { before: 'Retracing the crash · original code', after: 'Proving the fix · patched code' };
 
-const initial = { connection: 'connecting', run: null, pacing: false };
+const initial = { connection: 'connecting', run: null, pacing: false, engine: null };
 
 function reducer(state, { type, data }) {
   const run = state.run ?? {};
   switch (type) {
+    case 'reset':
+      return initial;
     case 'open':
       return { ...state, connection: 'live' };
     case 'offline':
       return { ...state, connection: 'offline' };
     case 'snapshot':
-      return { ...state, connection: 'live', pacing: data.pacing, run: data.incidentId ? data : null };
+      return { ...state, connection: 'live', pacing: data.pacing, engine: data.engine, run: data.run };
     case 'run':
       return { ...state, run: { ...data, logs: [], step: null, focus: null, frame: null, result: null } };
     case 'status':
@@ -57,10 +64,13 @@ function reducer(state, { type, data }) {
   }
 }
 
-function useEngineStream() {
+/** Live channel for one incident; reconnects when the selected incident changes. */
+function useIncidentStream(incidentId) {
   const [state, dispatch] = useReducer(reducer, initial);
   useEffect(() => {
-    const source = new EventSource(`${ENGINE_URL}/live`);
+    dispatch({ type: 'reset' });
+    if (!incidentId) return undefined;
+    const source = new EventSource(`${ENGINE_URL}/live?incident=${encodeURIComponent(incidentId)}`);
     source.onopen = () => dispatch({ type: 'open' });
     source.onerror = () => dispatch({ type: 'offline' }); // EventSource retries by itself
     const types = ['snapshot', 'run', 'status', 'log', 'step', 'focus', 'frame', 'done'];
@@ -73,9 +83,11 @@ function useEngineStream() {
       handlers.forEach(([type, handler]) => source.removeEventListener(type, handler));
       source.close();
     };
-  }, []);
+  }, [incidentId]);
   return state;
 }
+
+const IN_PROGRESS = ['reproducing', 'patching', 'verifying'];
 
 function describeStep(step) {
   const target = step.target ? ` ${step.target.replace(/^\[data-testid="(.+)"\]$/, '$1')}` : '';
@@ -178,9 +190,39 @@ function Screen({ run }) {
   );
 }
 
+/** Shown when this dashboard's engine has no live channel for the incident. */
+function StatusScene({ incident, engine }) {
+  const status = incident?.status;
+  const claimedBy = incident?.claimedBy;
+  const mine = claimedBy && engine && claimedBy.engineId === engine.engineId;
+
+  if (IN_PROGRESS.includes(status) && claimedBy && engine && !mine) {
+    const sameMachine = claimedBy.host === engine.host;
+    return (
+      <Scene sceneKey="elsewhere">
+        <div className={styles.crew}>
+          {sameMachine
+            ? 'Claimed by an earlier run of this engine (it was restarted mid-voyage).'
+            : <>Sailed by <strong>{claimedBy.host}</strong>’s engine. Only that crew can watch it live; the progress bar above follows it.</>}
+        </div>
+      </Scene>
+    );
+  }
+  if (IN_PROGRESS.includes(status)) return <Scene sceneKey="unwatched" />;
+
+  return (
+    <Scene sceneKey={SCENES[status] ? status : 'idle'}>
+      {status === 'fixed' && incident?.prUrl && (
+        <a className={styles.prLink} href={incident.prUrl} target="_blank" rel="noreferrer">
+          <ShipIcon size={16} /> View the pull request →
+        </a>
+      )}
+    </Scene>
+  );
+}
+
 export default function LiveJourney({ incident }) {
-  const { connection, run, pacing } = useEngineStream();
-  const watchingOther = run && incident && run.incidentId !== incident.incidentId;
+  const { connection, run, pacing, engine } = useIncidentStream(incident?.incidentId);
   const ticker = (run?.logs ?? []).slice(-TICKER_LINES);
 
   return (
@@ -195,10 +237,10 @@ export default function LiveJourney({ incident }) {
         {pacing && connection === 'live' && <span className="muted">demo pacing</span>}
       </h2>
 
-      {watchingOther && <div className={styles.note}>Engine is working on #{run.incidentId}</div>}
-
       <div className={styles.screen}>
-        {connection === 'offline' && !run ? (
+        {run ? (
+          <Screen run={run} />
+        ) : connection === 'offline' ? (
           <div className={styles.scene}>
             <span className={styles.sceneIcon}>
               <WaveIcon size={56} />
@@ -209,7 +251,7 @@ export default function LiveJourney({ incident }) {
             </div>
           </div>
         ) : (
-          <Screen run={run} />
+          <StatusScene incident={incident} engine={engine} />
         )}
       </div>
 
@@ -221,7 +263,7 @@ export default function LiveJourney({ incident }) {
             </li>
           ))
         ) : (
-          <li className={styles.tickerIdle}>No activity yet.</li>
+          <li className={styles.tickerIdle}>{run ? 'No activity yet.' : 'No live log for this voyage on this engine.'}</li>
         )}
       </ul>
     </section>

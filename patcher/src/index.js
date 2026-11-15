@@ -24,10 +24,11 @@ async function drain() {
   if (current) return;
   while (queue.length) {
     current = queue.shift();
-    live.startRun(current);
     let result = {};
     try {
-      await live.pace(live.PACE.detectMs); // demo pacing: let "Crash Detected" show before claiming
+      // Demo pacing: let "Crash Detected" show before claiming. The live channel starts only once
+      // the claim succeeds (db.claimIncident), so another engine's win never shows up here.
+      await live.pace(live.PACE.detectMs);
       result = (await runIncident(current)) ?? {};
     } catch (err) {
       // runIncident records its own failures; this only catches e.g. Mongo being down during claim.
@@ -45,10 +46,10 @@ const app = express();
 app.use(express.json());
 
 app.get('/health', (_req, res) => {
-  res.json({ ok: true, llmMode: LLM_MODE(), running: current, queued: queue.length, pacing: live.PACE.enabled });
+  res.json({ ok: true, llmMode: LLM_MODE(), running: current, queued: queue.length, pacing: live.PACE.enabled, engine: live.ENGINE });
 });
 
-// Live event stream for the dashboard's "Live Journey" window (Server-Sent Events).
+// Live event stream for the dashboard's "Live Journey" window: GET /live?incident=<id> (Server-Sent Events).
 app.get('/live', live.liveHandler);
 
 app.post('/incidents/:id/fix', (req, res) => {
