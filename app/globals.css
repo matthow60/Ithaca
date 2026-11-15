@@ -14,7 +14,7 @@
     Header ....... .incident-header .error-msg .pr-button(.disabled)
     Status ....... .badge .badge-open .badge-reproducing .badge-patching .badge-fixed .badge-failed
                    .voyage .voyage-sea/-water/-wake/-ship .pipeline .pipeline-step(.done/.active/.pending)
-                   .pipeline-dot .pipeline-label .starchart .star .star-line
+                   .pipeline-dot .pipeline-label .episode-note .starchart .star .star-line
                    .step-open/.step-reproducing/.step-patching/.step-fixed/.step-failed
     Gemini ....... .gemini .summary-grid .pillar .pillar-abacus .pillar-capital .volute
                    .pillar-echinus .pillar-shaft .pillar-base .pillar-plinth
@@ -304,7 +304,7 @@ h1, h2, h3 { font-weight: 600; }
 /* ---------- Pipeline: a voyage ----------
    A ship sails along the sea line to the current stage, leaving a teal wake; the stages are ports
    (round shields) below it. --stops, --at (ship position) and --last come from StatusPipeline.js. */
-.voyage { position: relative; margin: 0 0 30px; }
+.voyage { position: relative; z-index: 2; margin: 0 0 30px; } /* above the Gemini card, for the hover notes */
 .voyage-sea {
   position: relative;
   height: 44px;
@@ -376,6 +376,51 @@ h1, h2, h3 { font-weight: 600; }
   transition: background-color 0.6s, color 0.6s, box-shadow 0.6s;
 }
 .pipeline-dot svg { width: 18px; height: 18px; }
+.pipeline-step { position: relative; cursor: default; outline-offset: 6px; border-radius: 8px; }
+
+/* Hover / focus notes: one line from the episode each stage stands for */
+.episode-note {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 10px);
+  left: 50%;
+  width: max-content;
+  max-width: 230px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--ink-line);
+  border-radius: var(--radius);
+  background: var(--ink-deep);
+  box-shadow: 4px 4px 0 var(--shadow);
+  color: var(--marble);
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, -4px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.episode-note em { display: block; font-style: italic; }
+.episode-book {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--body);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+.pipeline-step:hover .episode-note,
+.pipeline-step:focus-visible .episode-note { opacity: 1; transform: translate(-50%, 0); }
+.pipeline-step:first-child .episode-note { left: 0; transform: translate(0, -4px); }
+.pipeline-step:first-child:hover .episode-note,
+.pipeline-step:first-child:focus-visible .episode-note { transform: translate(0, 0); }
+.pipeline-step:last-child .episode-note { left: auto; right: 0; transform: translate(0, -4px); }
+.pipeline-step:last-child:hover .episode-note,
+.pipeline-step:last-child:focus-visible .episode-note { transform: translate(0, 0); }
 
 .pipeline-step.done { color: var(--foam); }
 .pipeline-step.done .pipeline-dot {
@@ -641,6 +686,7 @@ h1, h2, h3 { font-weight: 600; }
   .pipeline-dot svg { width: 16px; height: 16px; }
   .voyage-sea { height: 38px; }
   .voyage-ship svg { width: 24px; height: 24px; }
+  .episode-note { max-width: 180px; font-size: 13.5px; }
   .main > .starchart { height: 150px; opacity: 0.55; }
   .summary-grid { padding: 6px 14px 4px; }
   .timeline-item { grid-template-columns: 28px auto minmax(0, 1fr); }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { CompassIcon, OwlIcon, ShipIcon, StormIcon, WaveIcon } from './Icons';
 
 // Maps the MongoDB `status` field (written by patcher/) to the demo stages.
@@ -24,6 +24,16 @@ const ICONS = {
   patching: OwlIcon,
   fixed: ShipIcon,
   failed: WaveIcon,
+};
+
+// A paraphrased line from the Odyssey for each stage, shown on hover / keyboard focus.
+const EPISODES = {
+  open: { line: 'Poseidon gathers the clouds and stirs up the sea.', book: 5 },
+  reproducing: { line: 'Blind Tiresias sees the path that led him here.', book: 11 },
+  patching: { line: 'Grey-eyed Athena sets the course straight.', book: 13 },
+  fixed: { line: 'Home to Ithaca, and the bed built round the olive tree.', book: 23 },
+  failed: { line: 'Charybdis drinks down the dark sea, ship and all.', book: 12 },
+  not_reproducible: { line: 'Whoever eats the lotus forgets the way home.', book: 9 },
 };
 
 const stageIndex = (status) => STAGES.findIndex((s) => s.statuses.includes(status));
@@ -57,6 +67,7 @@ export default function StatusPipeline({ status, incidentKey }) {
   // A failed run stopped somewhere after detection; the ship ends up at the failure port.
   const current = failure ? stops.length - 1 : Math.max(0, stageIndex(status));
   const finished = status === 'fixed';
+  const uid = useId().replace(/[^a-zA-Z0-9-]/g, '');
 
   // Each newly selected incident starts at the first port (instantly), then sails to where it
   // is now. Later status changes on the same incident just glide on from the current port.
@@ -91,8 +102,6 @@ export default function StatusPipeline({ status, incidentKey }) {
     <div
       className={`voyage ${instant ? 'is-instant' : ''}`}
       style={{ '--stops': stops.length, '--at': at, '--last': stops.length - 1 }}
-      role="group"
-      aria-label={`Status: ${failure || STAGES[current].label}`}
     >
       <div className="voyage-sea" aria-hidden="true">
         <div className="voyage-water" />
@@ -101,7 +110,7 @@ export default function StatusPipeline({ status, incidentKey }) {
           <ShipIcon size={30} />
         </div>
       </div>
-      <ol className="pipeline">
+      <ol className="pipeline" aria-label={`Status: ${failure || STAGES[current].label}`}>
         {stops.map((stage, i) => {
           let state = 'pending';
           if (stage.key === 'failed') state = 'active';
@@ -109,12 +118,23 @@ export default function StatusPipeline({ status, incidentKey }) {
           else if (i < current || (finished && i === current)) state = 'done';
           else if (i === current) state = 'active';
           const StageIcon = ICONS[stage.key];
+          const { line, book } = EPISODES[stage.key === 'failed' ? status : stage.key];
+          const noteId = `episode-${uid}-${stage.key}`;
           return (
-            <li key={stage.key} className={`pipeline-step ${state} step-${stage.key}`}>
+            <li
+              key={stage.key}
+              className={`pipeline-step ${state} step-${stage.key}`}
+              tabIndex={0}
+              aria-describedby={noteId}
+            >
               <span className="pipeline-dot">
                 <StageIcon size={18} />
               </span>
               <span className="pipeline-label">{stage.label}</span>
+              <span className="episode-note" id={noteId} role="tooltip">
+                <em>“{line}”</em>
+                <span className="episode-book">Odyssey, Book {book}</span>
+              </span>
             </li>
           );
         })}
